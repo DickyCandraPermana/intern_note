@@ -1,10 +1,13 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
 import 'providers/app_provider.dart';
 import 'screens/main_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,12 +32,16 @@ class InternNoterApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = context.select<AppProvider, ThemeMode>(
+      (provider) => provider.themeMode,
+    );
+
     return MaterialApp(
       title: 'Intern Noter',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
       home: const MainScreen(),
     );
   }
