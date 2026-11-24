@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_canvas">#121417</color>
+    <color name="widget_surface">#1B1F24</color>
+    <color name="widget_surface_alt">#232830</color>
+    <color name="widget_ink_primary">#F1F3F5</color>
+    <color name="widget_ink_muted">#9BA4B0</color>
+    <color name="widget_border">#2C323B</color>
+    <color name="widget_accent">#60A5FA</color>
+    <color name="widget_on_accent">#0E1A2B</color>
+    <color name="widget_accent_tint">#1E2E44</color>
+    <color name="widget_destructive">#F87171</color>
+</resources>
