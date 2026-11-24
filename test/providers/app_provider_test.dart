@@ -130,6 +130,37 @@ void main() {
     expect(fakeSync.updateCount, 3);
   });
 
+  test('deleteDailyLog returns null when row is already absent on disk', () async {
+    final (helper, _, provider) = await createTestProvider();
+
+    await provider.addDailyLog(
+      DailyLog(
+        date: '2026-11-13',
+        baseHours: 8.0,
+        overworkHours: 0.0,
+        lines: [
+          ActivityLine(
+            modul: 'Core',
+            project: 'EVOQ 7E',
+            description: 'Already deleted on disk',
+            sortOrder: 0,
+          ),
+        ],
+      ),
+    );
+
+    final created = provider.getDailyLogForDate(DateTime(2026, 11, 13));
+    expect(created, isNotNull);
+    expect(created!.id, isNotNull);
+
+    final deletedDirectly = await helper.deleteDailyLog(created.id!);
+    expect(deletedDirectly, 1);
+
+    final snapshot = await provider.deleteDailyLog(created.id!);
+    expect(snapshot, isNull);
+    expect(provider.getDailyLogForDate(DateTime(2026, 11, 13)), isNull);
+  });
+
   test('timelineFilter filters by currentCycle and needsTag (uncategorized lines)', () async {
     final (_, _, provider) = await createTestProvider();
     final now = DateTime.now();

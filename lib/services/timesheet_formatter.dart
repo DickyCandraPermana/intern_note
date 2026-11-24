@@ -82,6 +82,10 @@ class TimesheetFormatter {
           if (aId != null && bId != null) {
             final idCmp = aId.compareTo(bId);
             if (idCmp != 0) return idCmp;
+          } else if (aId != null) {
+            return -1;
+          } else if (bId != null) {
+            return 1;
           }
           return a.key.compareTo(b.key);
         });

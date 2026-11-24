@@ -86,7 +86,7 @@ void main() {
   testWidgets(
     'renders Dashboard in both Light and Dark themes without overflow and shows empty CTA',
     (WidgetTester tester) async {
-      setViewport(tester, const Size(500, 844));
+      setViewport(tester, const Size(390, 844));
       final (_, _, provider) = await createTestHarness(
         tester,
         initialConfig: GlobalConfig.defaults().copyWith(
@@ -131,7 +131,7 @@ void main() {
   testWidgets(
     'shows Perlu tag modul/project pill when today has uncategorized quick note',
     (WidgetTester tester) async {
-      setViewport(tester, const Size(500, 844));
+      setViewport(tester, const Size(390, 844));
       final (_, _, provider) = await createTestHarness(
         tester,
         initialConfig: GlobalConfig.defaults().copyWith(themeMode: 'light'),
@@ -166,6 +166,83 @@ void main() {
         find.descendant(
           of: find.byType(DailyLogSheet),
           matching: find.text('Cek pipeline deploy harian'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'previousCycle does not leak today uncategorized pill into KPI card while TodayNoteCard keeps today info',
+    (WidgetTester tester) async {
+      setViewport(tester, const Size(390, 844));
+      final (_, _, provider) = await createTestHarness(
+        tester,
+        initialConfig: GlobalConfig.defaults().copyWith(themeMode: 'light'),
+      );
+
+      await tester.runAsync(
+        () => provider.quickAddTodayNote(
+          description: 'Catatan belum bertag hari ini',
+          modul: '',
+          project: '',
+        ),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AppProvider>.value(
+          value: provider,
+          child: const InternNoterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final kpiCard = find.ancestor(
+        of: find.text('Total Jam'),
+        matching: find.byType(JournalCard),
+      );
+      final todayCard = find.ancestor(
+        of: find.text('Catatan Hari Ini'),
+        matching: find.byType(JournalCard),
+      );
+
+      expect(
+        find.descendant(
+          of: kpiCard,
+          matching: find.text('Perlu tag modul/project'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: todayCard,
+          matching: find.text('Perlu tag modul/project'),
+        ),
+        findsOneWidget,
+      );
+
+      provider.previousCycle();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(
+          of: kpiCard,
+          matching: find.text('Perlu tag modul/project'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: todayCard,
+          matching: find.text('Catatan belum bertag hari ini'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: todayCard,
+          matching: find.text('Perlu tag modul/project'),
         ),
         findsOneWidget,
       );

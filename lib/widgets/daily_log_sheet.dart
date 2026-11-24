@@ -292,7 +292,9 @@ class _DailyLogSheetState extends State<DailyLogSheet> {
     final String nextText;
     if (current.isEmpty) {
       nextText = preset;
-    } else if (current.split(RegExp(r'\r?\n')).any((p) => p.trim() == preset)) {
+    } else if (current
+        .split(RegExp(r'\r?\n'))
+        .any((p) => p.trim() == preset.trim())) {
       nextText = current;
     } else {
       nextText = '$current\n$preset';
@@ -573,7 +575,7 @@ class _DailyLogSheetState extends State<DailyLogSheet> {
                           onChanged: (_) => _hoursEditedByUser = true,
                           validator: (v) {
                             final parsed = double.tryParse((v ?? '').trim());
-                            if (parsed == null || parsed < 0) {
+                            if (parsed == null || !parsed.isFinite || parsed < 0) {
                               return 'Jam tidak valid';
                             }
                             return null;
@@ -596,7 +598,7 @@ class _DailyLogSheetState extends State<DailyLogSheet> {
                           onChanged: (_) => _hoursEditedByUser = true,
                           validator: (v) {
                             final parsed = double.tryParse((v ?? '').trim());
-                            if (parsed == null || parsed < 0) {
+                            if (parsed == null || !parsed.isFinite || parsed < 0) {
                               return 'Jam tidak valid';
                             }
                             return null;

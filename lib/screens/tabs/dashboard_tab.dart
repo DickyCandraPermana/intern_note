@@ -140,12 +140,6 @@ class _DashboardTabState extends State<DashboardTab> {
             }
           }
 
-          if (uncategorizedLogs.isEmpty &&
-              todayLog != null &&
-              todayLog.hasUncategorizedLines) {
-            uncategorizedLogs.add(todayLog);
-          }
-
           final topProjects = projectHours.entries.toList()
             ..sort((a, b) => b.value.compareTo(a.value));
 
@@ -159,6 +153,7 @@ class _DashboardTabState extends State<DashboardTab> {
           return RefreshIndicator(
             onRefresh: provider.refreshFromDisk,
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
                 if (provider.errorMessage != null) ...[
@@ -478,13 +473,15 @@ class _KpiSummaryCard extends StatelessWidget {
                             color: colors.accent,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            '${missingDays.length} hari kerja belum dicatat',
-                            style: AppTheme.tabularStyle(
-                              TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: colors.accent,
+                          Flexible(
+                            child: Text(
+                              '${missingDays.length} hari kerja belum dicatat',
+                              style: AppTheme.tabularStyle(
+                                TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.accent,
+                                ),
                               ),
                             ),
                           ),

@@ -161,6 +161,53 @@ void main() {
       expect(formatted.grandTotalDays, 2.125);
     });
 
+    test('maintains total strict weak ordering when mixing persisted and unsaved lines with equal sortOrder', () {
+      final logs = [
+        DailyLog(
+          date: '2026-11-05',
+          baseHours: 8.0,
+          overworkHours: 0.0,
+          lines: [
+            ActivityLine(
+              id: 2,
+              modul: 'OMS',
+              project: 'KH',
+              description: 'Persisted id 2',
+              sortOrder: 0,
+            ),
+            ActivityLine(
+              id: null,
+              modul: 'OMS',
+              project: 'KH',
+              description: 'Unsaved first',
+              sortOrder: 0,
+            ),
+            ActivityLine(
+              id: 1,
+              modul: 'OMS',
+              project: 'KH',
+              description: 'Persisted id 1',
+              sortOrder: 0,
+            ),
+            ActivityLine(
+              id: null,
+              modul: 'OMS',
+              project: 'KH',
+              description: 'Unsaved second',
+              sortOrder: 0,
+            ),
+          ],
+        ),
+      ];
+
+      final formatted = TimesheetFormatter.aggregateLogs(logs);
+      expect(formatted.rows.length, 1);
+      expect(
+        formatted.rows.single.activity,
+        '1. Persisted id 1\n2. Persisted id 2\n3. Unsaved first\n4. Unsaved second',
+      );
+    });
+
     test('estimates wrapped lines and enforces minimum row height 48.0', () {
       expect(TimesheetFormatter.estimateWrappedLines('Short', 47), 1);
       expect(TimesheetFormatter.estimateWrappedLines('A\nB\nC', 47), 3);

@@ -186,7 +186,7 @@ class QuickNoteActivity : Activity() {
         val horizontalPad = dpToPx(12)
         val verticalPad = dpToPx(8)
         val chipMarginEnd = dpToPx(8)
-        val chipMinHeight = dpToPx(36)
+        val chipMinHeight = dpToPx(44)
 
         return TextView(this).apply {
             text = label

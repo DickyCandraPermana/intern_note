@@ -64,7 +64,7 @@ class XlsxExportEngine {
     if (doc == null) return;
 
     final toRemove = doc
-        .findAllElements('Override')
+        .findAllElements('Override', namespace: '*')
         .where((el) => el.getAttribute('PartName') == '/xl/calcChain.xml')
         .toList();
     for (final node in toRemove) {

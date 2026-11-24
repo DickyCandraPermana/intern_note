@@ -109,40 +109,6 @@ class ExportService {
     );
   }
 
-  // Compatibility wrapper kept until Task 7 updates ExportDialog.
-  static Future<void> exportToXlsx(
-    List<DailyLog> logs,
-    GlobalConfig config,
-    DateTime month,
-    DateTime exportDate, {
-    bool? includeSignature,
-  }) async {
-    await exportAndShareXlsx(
-      logs: logs,
-      config: config,
-      cycleMonth: month,
-      exportDate: exportDate,
-      includeSignature: includeSignature,
-    );
-  }
-
-  // Compatibility wrapper kept until Task 7 updates ExportDialog.
-  static Future<void> exportToPdf(
-    List<DailyLog> logs,
-    GlobalConfig config,
-    DateTime month,
-    DateTime exportDate, {
-    bool? includeSignature,
-  }) async {
-    await exportAndSharePdf(
-      logs: logs,
-      config: config,
-      cycleMonth: month,
-      exportDate: exportDate,
-      includeSignature: includeSignature,
-    );
-  }
-
   static Future<Uint8List> _loadAssetBytes(String assetPath) async {
     final data = await rootBundle.load(assetPath);
     return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);

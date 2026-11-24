@@ -651,6 +651,7 @@ class _SettingsTabState extends State<SettingsTab> {
                           final parsed = double.tryParse(trimmed);
                           if (trimmed.isEmpty ||
                               parsed == null ||
+                              !parsed.isFinite ||
                               parsed <= 0) {
                             return 'Masukkan jam dasar yang valid (> 0)';
                           }

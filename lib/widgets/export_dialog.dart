@@ -347,21 +347,25 @@ class _ExportDialogState extends State<ExportDialog> {
               const SizedBox(height: 8),
               TextField(
                 controller: _picController,
+                enabled: !_isExporting,
                 decoration: const InputDecoration(labelText: 'PIC Consultant'),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _roleController,
+                enabled: !_isExporting,
                 decoration: const InputDecoration(labelText: 'Role'),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _createdByController,
+                enabled: !_isExporting,
                 decoration: const InputDecoration(labelText: 'Created By'),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: _approvedByLeadController,
+                enabled: !_isExporting,
                 decoration: const InputDecoration(
                   labelText: 'Approved By Lead Project',
                 ),
@@ -382,6 +386,7 @@ class _ExportDialogState extends State<ExportDialog> {
                 const SizedBox(height: 6),
                 TextField(
                   controller: _approvedByController,
+                  enabled: !_isExporting,
                   decoration: const InputDecoration(
                     labelText: 'Approved By Name',
                   ),

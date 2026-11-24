@@ -278,7 +278,7 @@ class AppProvider with ChangeNotifier {
     final deleted = await _db.deleteDailyLog(id);
     await _reloadLogsAndSuggestions();
     await _widgetSync.updateWidget();
-    if (deleted == 0 && snapshot == null) {
+    if (deleted == 0) {
       return null;
     }
     return snapshot;
