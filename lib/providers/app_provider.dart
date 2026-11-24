@@ -25,6 +25,7 @@ class AppProvider with ChangeNotifier {
   BillingCycle _activeCycle;
   bool _hasLoadedOnce = false;
   bool _disposed = false;
+  Future<void>? _activeDbRefresh;
 
   AppProvider({
     DatabaseHelper? dbHelper,
@@ -107,15 +108,25 @@ class AppProvider with ChangeNotifier {
 
   Future<void> _initData() async {
     if (_disposed) return;
-    _errorMessage = null;
-    try {
-      await _loadFromDb(updateCycle: true);
-    } catch (e) {
-      _errorMessage = 'Gagal memuat data: $e';
-    } finally {
-      _isLoading = false;
-      _safeNotify();
-    }
+    final run = () async {
+      if (_disposed) return;
+      _errorMessage = null;
+      try {
+        await _loadFromDb(updateCycle: true);
+      } catch (e) {
+        _errorMessage = 'Gagal memuat data: $e';
+      } finally {
+        _isLoading = false;
+        _safeNotify();
+      }
+    }();
+    _activeDbRefresh = run;
+    run.whenComplete(() {
+      if (identical(_activeDbRefresh, run)) {
+        _activeDbRefresh = null;
+      }
+    });
+    await run;
   }
 
   Future<void> _loadFromDb({required bool updateCycle}) async {
@@ -156,16 +167,32 @@ class AppProvider with ChangeNotifier {
     _safeNotify();
   }
 
-  Future<void> refreshFromDisk() async {
-    if (_disposed) return;
-    try {
-      await _loadFromDb(updateCycle: !_hasLoadedOnce);
-    } catch (e) {
-      _errorMessage = 'Gagal menyinkronkan data: $e';
-    } finally {
-      _isLoading = false;
-      _safeNotify();
-    }
+  Future<void> refreshFromDisk() {
+    if (_disposed) return Future.value();
+    final previous = _activeDbRefresh;
+    final next = () async {
+      if (previous != null) {
+        try {
+          await previous;
+        } catch (_) {}
+      }
+      if (_disposed) return;
+      try {
+        await _loadFromDb(updateCycle: !_hasLoadedOnce);
+      } catch (e) {
+        _errorMessage = 'Gagal menyinkronkan data: $e';
+      } finally {
+        _isLoading = false;
+        _safeNotify();
+      }
+    }();
+    _activeDbRefresh = next;
+    next.whenComplete(() {
+      if (identical(_activeDbRefresh, next)) {
+        _activeDbRefresh = null;
+      }
+    });
+    return next;
   }
 
   Future<void> retryLoad() async {

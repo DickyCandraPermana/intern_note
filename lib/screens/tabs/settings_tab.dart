@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -31,13 +32,32 @@ class _SettingsTabState extends State<SettingsTab> {
   final _defaultProjectController = TextEditingController();
   final _newPresetController = TextEditingController();
 
-  String? _syncedConfigFingerprint;
+  AppProvider? _provider;
+  GlobalConfig? _lastSyncedConfig;
   int _selectedCutoffDay = 24;
   bool _isBackingUp = false;
   bool _isRestoring = false;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextProvider = context.read<AppProvider>();
+    if (!identical(_provider, nextProvider)) {
+      _provider?.removeListener(_onProviderChanged);
+      _provider = nextProvider;
+      _provider!.addListener(_onProviderChanged);
+      if (!_provider!.isLoading) {
+        _applyConfigToFields(
+          _provider!.effectiveConfig,
+          forceAll: _lastSyncedConfig == null,
+        );
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    _provider?.removeListener(_onProviderChanged);
     _picController.dispose();
     _roleController.dispose();
     _createdByController.dispose();
@@ -50,40 +70,90 @@ class _SettingsTabState extends State<SettingsTab> {
     super.dispose();
   }
 
-  String _fingerprint(GlobalConfig config) {
-    return [
-      config.picConsultant,
-      config.role,
+  void _onProviderChanged() {
+    if (!mounted || _provider == null || _provider!.isLoading) return;
+    _scheduleSync(_provider!.effectiveConfig);
+  }
+
+  void _scheduleSync(GlobalConfig config, {bool forceAll = false}) {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _applyConfigToFields(config, forceAll: forceAll, allowSetState: true);
+      });
+      return;
+    }
+    _applyConfigToFields(config, forceAll: forceAll, allowSetState: true);
+  }
+
+  void _applyConfigToFields(
+    GlobalConfig config, {
+    bool forceAll = false,
+    bool allowSetState = false,
+  }) {
+    final prev = _lastSyncedConfig;
+
+    void syncController(
+      TextEditingController controller,
+      String nextValue,
+      String? prevValue,
+    ) {
+      if (forceAll || prev == null || prevValue != nextValue) {
+        if (controller.text != nextValue) {
+          controller.text = nextValue;
+        }
+      }
+    }
+
+    syncController(_picController, config.picConsultant, prev?.picConsultant);
+    syncController(_roleController, config.role, prev?.role);
+    syncController(
+      _createdByController,
       config.createdByName,
+      prev?.createdByName,
+    );
+    syncController(
+      _approvedByController,
       config.approvedByName,
+      prev?.approvedByName,
+    );
+    syncController(
+      _approvedByLeadController,
       config.approvedByLeadName,
-      config.defaultBaseHours,
-      config.themeMode,
-      config.cutoffDay,
+      prev?.approvedByLeadName,
+    );
+    syncController(
+      _baseHoursController,
+      config.defaultBaseHours.toString(),
+      prev?.defaultBaseHours.toString(),
+    );
+    syncController(
+      _defaultModulController,
       config.defaultModul,
+      prev?.defaultModul,
+    );
+    syncController(
+      _defaultProjectController,
       config.defaultProject,
-      config.quickPresets.join('|'),
-      config.includeSignature,
-    ].join('::');
+      prev?.defaultProject,
+    );
+
+    final nextCutoff = config.cutoffDay.clamp(1, 28);
+    if (forceAll || prev == null || prev.cutoffDay != config.cutoffDay) {
+      if (_selectedCutoffDay != nextCutoff) {
+        if (allowSetState && mounted) {
+          setState(() => _selectedCutoffDay = nextCutoff);
+        } else {
+          _selectedCutoffDay = nextCutoff;
+        }
+      }
+    }
+
+    _lastSyncedConfig = config.copyWith();
   }
 
-  void _syncControllersIfChanged(GlobalConfig config) {
-    final nextFingerprint = _fingerprint(config);
-    if (_syncedConfigFingerprint == nextFingerprint) return;
-    _syncedConfigFingerprint = nextFingerprint;
-
-    _picController.text = config.picConsultant;
-    _roleController.text = config.role;
-    _createdByController.text = config.createdByName;
-    _approvedByController.text = config.approvedByName;
-    _approvedByLeadController.text = config.approvedByLeadName;
-    _baseHoursController.text = config.defaultBaseHours.toString();
-    _defaultModulController.text = config.defaultModul;
-    _defaultProjectController.text = config.defaultProject;
-    _selectedCutoffDay = config.cutoffDay.clamp(1, 28);
-  }
-
-  GlobalConfig _buildUpdatedConfig(GlobalConfig base) {
+  GlobalConfig _buildFormConfig(GlobalConfig base) {
     final parsedHours = double.tryParse(_baseHoursController.text.trim());
     return base.copyWith(
       picConsultant: _picController.text.trim(),
@@ -91,18 +161,36 @@ class _SettingsTabState extends State<SettingsTab> {
       createdByName: _createdByController.text.trim(),
       approvedByName: _approvedByController.text.trim(),
       approvedByLeadName: _approvedByLeadController.text.trim(),
-      defaultBaseHours:
-          (parsedHours != null && parsedHours > 0) ? parsedHours : 8.0,
+      defaultBaseHours: (parsedHours != null && parsedHours > 0)
+          ? parsedHours
+          : base.defaultBaseHours,
       cutoffDay: _selectedCutoffDay,
       defaultModul: _defaultModulController.text.trim(),
       defaultProject: _defaultProjectController.text.trim(),
     );
   }
 
+  Future<void> _updateSingleSetting(
+    AppProvider provider,
+    GlobalConfig updated,
+    String errorPrefix, {
+    VoidCallback? onError,
+  }) async {
+    try {
+      await provider.updateGlobalConfig(updated);
+    } catch (e) {
+      onError?.call();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$errorPrefix: $e')),
+      );
+    }
+  }
+
   Future<void> _saveConfig(AppProvider provider) async {
     if (!_formKey.currentState!.validate()) return;
     final base = provider.effectiveConfig;
-    final updated = _buildUpdatedConfig(base);
+    final updated = _buildFormConfig(base);
     try {
       await provider.updateGlobalConfig(updated);
       if (!mounted) return;
@@ -125,26 +213,37 @@ class _SettingsTabState extends State<SettingsTab> {
     final raw = _newPresetController.text.trim();
     if (raw.isEmpty) return;
 
-    final base = _buildUpdatedConfig(provider.effectiveConfig);
-    final updatedPresets = List<String>.from(base.quickPresets);
+    final config = provider.effectiveConfig;
+    final updatedPresets = List<String>.from(config.quickPresets);
     final alreadyExists = updatedPresets.any(
       (item) => item.toLowerCase() == raw.toLowerCase(),
     );
     if (!alreadyExists) {
       updatedPresets.add(raw);
     }
-    _newPresetController.clear();
-    await provider.updateGlobalConfig(
-      base.copyWith(quickPresets: updatedPresets),
-    );
+
+    try {
+      await provider.updateGlobalConfig(
+        config.copyWith(quickPresets: updatedPresets),
+      );
+      if (!mounted) return;
+      _newPresetController.clear();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menambah preset: $e')),
+      );
+    }
   }
 
   Future<void> _removePreset(AppProvider provider, String preset) async {
-    final base = _buildUpdatedConfig(provider.effectiveConfig);
+    final config = provider.effectiveConfig;
     final updatedPresets =
-        base.quickPresets.where((item) => item != preset).toList();
-    await provider.updateGlobalConfig(
-      base.copyWith(quickPresets: updatedPresets),
+        config.quickPresets.where((item) => item != preset).toList();
+    await _updateSingleSetting(
+      provider,
+      config.copyWith(quickPresets: updatedPresets),
+      'Gagal menghapus preset',
     );
   }
 
@@ -166,7 +265,9 @@ class _SettingsTabState extends State<SettingsTab> {
       final colors = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Backup siap dibagikan (${provider.dailyLogs.length} hari)'),
+          content: Text(
+            'Backup siap dibagikan (${provider.dailyLogs.length} hari)',
+          ),
           backgroundColor: colors.success,
         ),
       );
@@ -259,7 +360,7 @@ class _SettingsTabState extends State<SettingsTab> {
       final restoreResult = await provider.restoreBackup(payload, mode);
       if (!mounted) return;
 
-      _syncedConfigFingerprint = null;
+      _scheduleSync(provider.effectiveConfig, forceAll: true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -307,7 +408,6 @@ class _SettingsTabState extends State<SettingsTab> {
           }
 
           final config = provider.effectiveConfig;
-          _syncControllersIfChanged(config);
 
           return Form(
             key: _formKey,
@@ -352,11 +452,11 @@ class _SettingsTabState extends State<SettingsTab> {
                         ],
                         selected: {config.themeMode},
                         onSelectionChanged: (selection) {
-                          final nextMode = selection.first;
-                          final updated = _buildUpdatedConfig(config).copyWith(
-                            themeMode: nextMode,
+                          _updateSingleSetting(
+                            provider,
+                            config.copyWith(themeMode: selection.first),
+                            'Gagal mengubah tema',
                           );
-                          provider.updateGlobalConfig(updated);
                         },
                       ),
                     ],
@@ -394,11 +494,18 @@ class _SettingsTabState extends State<SettingsTab> {
                         }),
                         onChanged: (val) {
                           if (val == null) return;
+                          final prevDay = _selectedCutoffDay;
                           setState(() => _selectedCutoffDay = val);
-                          final updated = _buildUpdatedConfig(config).copyWith(
-                            cutoffDay: val,
+                          _updateSingleSetting(
+                            provider,
+                            config.copyWith(cutoffDay: val),
+                            'Gagal menyimpan cutoff day',
+                            onError: () {
+                              if (mounted) {
+                                setState(() => _selectedCutoffDay = prevDay);
+                              }
+                            },
                           );
-                          provider.updateGlobalConfig(updated);
                         },
                       ),
                       const SizedBox(height: 12),
@@ -487,10 +594,11 @@ class _SettingsTabState extends State<SettingsTab> {
                         ),
                         value: config.includeSignature,
                         onChanged: (val) {
-                          final updated = _buildUpdatedConfig(config).copyWith(
-                            includeSignature: val,
+                          _updateSingleSetting(
+                            provider,
+                            config.copyWith(includeSignature: val),
+                            'Gagal mengubah pengaturan tanda tangan',
                           );
-                          provider.updateGlobalConfig(updated);
                         },
                       ),
                       const SizedBox(height: 8),
@@ -563,7 +671,10 @@ class _SettingsTabState extends State<SettingsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text('Backup & Restore JSON', style: theme.textTheme.titleMedium),
+                      Text(
+                        'Backup & Restore JSON',
+                        style: theme.textTheme.titleMedium,
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         'Cadangkan seluruh log aktivitas dan pengaturan dalam format JSON, atau pulihkan ke perangkat ini.',
@@ -578,7 +689,9 @@ class _SettingsTabState extends State<SettingsTab> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.upload_file_outlined),
                         label: const Text('Export JSON Backup'),
@@ -592,7 +705,9 @@ class _SettingsTabState extends State<SettingsTab> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.restore_page_outlined),
                         label: const Text('Restore JSON Backup'),

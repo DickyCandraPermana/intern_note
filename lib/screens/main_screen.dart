@@ -22,6 +22,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _calendarJumpNonce = 0;
   bool _isCheckingPendingRoute = false;
   bool _isOpeningTodaySheet = false;
+  bool _recheckRequested = false;
+  Future<void>? _latestRefreshFuture;
 
   @override
   void initState() {
@@ -41,38 +43,61 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      context.read<AppProvider>().refreshFromDisk();
-      _checkPendingRoute();
+      final refresh = context.read<AppProvider>().refreshFromDisk();
+      _latestRefreshFuture = refresh;
+      _checkPendingRoute(refreshFuture: refresh);
     }
   }
 
-  Future<void> _checkPendingRoute() async {
-    if (!mounted || _isCheckingPendingRoute || _isOpeningTodaySheet) return;
+  Future<void> _checkPendingRoute({Future<void>? refreshFuture}) async {
+    if (!mounted) return;
+    if (_isCheckingPendingRoute) {
+      _recheckRequested = true;
+      if (refreshFuture != null) {
+        _latestRefreshFuture = refreshFuture;
+      }
+      return;
+    }
+    if (_isOpeningTodaySheet) return;
+
     _isCheckingPendingRoute = true;
     try {
-      final provider = context.read<AppProvider>();
-      final route = await provider.consumePendingRoute();
-      if (!mounted || route != 'open_today') return;
+      var activeRefresh = refreshFuture ?? _latestRefreshFuture;
+      do {
+        _recheckRequested = false;
+        final provider = context.read<AppProvider>();
+        final route = await provider.consumePendingRoute();
+        if (!mounted) return;
 
-      if (provider.isLoading) {
-        await provider.refreshFromDisk();
-      }
-      if (!mounted) return;
+        if (route == 'open_today') {
+          if (activeRefresh != null) {
+            await activeRefresh;
+          } else {
+            await provider.refreshFromDisk();
+          }
+          if (!mounted) return;
 
-      _isOpeningTodaySheet = true;
-      final today = DateTime.now();
-      final existing = provider.getDailyLogForDate(today);
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => DailyLogSheet(
-          initialDate: today,
-          log: existing,
-        ),
-      );
+          _isOpeningTodaySheet = true;
+          final today = DateTime.now();
+          final existing = provider.getDailyLogForDate(today);
+          try {
+            await showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => DailyLogSheet(
+                initialDate: today,
+                log: existing,
+              ),
+            );
+          } finally {
+            _isOpeningTodaySheet = false;
+          }
+          return;
+        }
+        activeRefresh = _latestRefreshFuture;
+      } while (_recheckRequested && mounted);
     } finally {
       _isCheckingPendingRoute = false;
-      _isOpeningTodaySheet = false;
     }
   }
 
