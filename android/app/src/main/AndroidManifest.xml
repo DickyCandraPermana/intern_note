@@ -25,6 +25,29 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity
+            android:name=".widget.QuickNoteActivity"
+            android:exported="false"
+            android:theme="@style/Theme.QuickNoteOverlay"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:taskAffinity="com.example.intern_noter.quicknote"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+        <receiver
+            android:name=".widget.TodayNoteWidgetProvider"
+            android:exported="true"
+            android:label="Catatan Hari Ini">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_CHANGED" />
+                <action android:name="com.example.intern_noter.widget.ACTION_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_note_widget_info" />
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
